@@ -8,6 +8,8 @@ from config import TOKEN, DB_URL
 
 # Настройки бота
 bot = Bot(token=TOKEN)
+
+# Создание диспетчера
 dp = Dispatcher(bot)
 
 # Подключение к базе PostgreSQL
