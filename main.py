@@ -10,10 +10,10 @@ import datetime
 from PIL import Image, ImageDraw, ImageFont
    
 # Replace 'YOUR_TELEGRAM_BOT_TOKEN' with the token you obtained from BotFather
-bot = TeleBot(os.getenv('tg_key'))
+bot = TeleBot('8092903063:AAGMsvkSUQqmExlFVJqEsBKqbjQDu3ZdU3M')
 
 # Set the timezone to Nicosia, Cyprus (GMT+3)
-tz = pytz.timezone('Asia/Nicosia') 
+tz = pytz.timezone('Europe/Moscow')
  
 #Call keep_alive function to connect to the flask server
 keep_alive()
