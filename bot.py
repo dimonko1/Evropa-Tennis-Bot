@@ -4,6 +4,7 @@ import asyncpg
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime, timedelta
+from aiogram.filters import Command
 from config import TOKEN, DB_URL
 
 # Настройки бота
@@ -50,7 +51,7 @@ def get_time_keyboard(date):
     return keyboard
 
 # Обработка команды /start
-@dp.message(commands=["start"])
+@dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer("Выберите день для бронирования:", reply_markup=get_date_keyboard())
 
