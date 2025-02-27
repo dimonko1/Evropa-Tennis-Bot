@@ -50,12 +50,12 @@ def get_time_keyboard(date):
     return keyboard
 
 # Обработка команды /start
-@dp.message_handler(commands=["start"])
+@dp.message(commands=["start"])
 async def start(message: types.Message):
     await message.answer("Выберите день для бронирования:", reply_markup=get_date_keyboard())
 
 # Обработка выбора даты
-@dp.callback_query_handler(lambda c: c.data.startswith('date_'))
+@dp.callback_query(lambda c: c.data.startswith('date_'))
 async def handle_date_selection(callback_query: types.CallbackQuery):
     selected_date = callback_query.data.split("_")[1]
     selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
@@ -67,7 +67,7 @@ async def handle_date_selection(callback_query: types.CallbackQuery):
     )
 
 # Обработка выбора времени
-@dp.callback_query_handler(lambda c: c.data.startswith('time_'))
+@dp.callback_query(lambda c: c.data.startswith('time_'))
 async def handle_time_selection(callback_query: types.CallbackQuery):
     date_str, slot = callback_query.data.split("_")[1], callback_query.data.split("_")[2]
     selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
