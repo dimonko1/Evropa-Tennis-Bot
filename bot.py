@@ -25,8 +25,8 @@ async def init_db():
 # Клавиатура с выбором времени
 keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 timeslots = ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"]
-for slot in timeslots:
-    keyboard.add(KeyboardButton(slot))
+buttons = [KeyboardButton(slot) for slot in timeslots]
+keyboard.add(*buttons)  # добавляем все кнопки за один раз
 
 # Клавиатура для отмены брони
 cancel_button = KeyboardButton("Отменить бронирование")
