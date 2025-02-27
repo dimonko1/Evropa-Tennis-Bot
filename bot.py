@@ -1,115 +1,98 @@
-import os
 import logging
+import asyncio
+import asyncpg
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums import ParseMode
-from aiogram.utils.formatting import as_list, as_line, Text
-from aiogram import F
-from aiogram.utils.chat_action import ChatActionMiddleware
 from datetime import datetime, timedelta
-import psycopg2
+from config import TOKEN, DB_URL
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
+# Настройки бота
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
-# Инициализация бота и диспетчера
-API_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+# Подключение к базе PostgreSQL
+async def init_db():
+    conn = await asyncpg.connect(DB_URL)
+    await conn.execute('''CREATE TABLE IF NOT EXISTS bookings (
+                            id SERIAL PRIMARY KEY,
+                            user_id BIGINT,
+                            user_name TEXT,
+                            slot TEXT,
+                            date TIMESTAMP
+                          );''')
+    await conn.close()
 
-# Подключение к базе данных
-DATABASE_URL = os.getenv('DATABASE_URL')
-conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-cursor = conn.cursor()
+# Получение списка доступных дат (следующие 7 дней)
+def get_dates():
+    today = datetime.now().date()
+    return [today + timedelta(days=i) for i in range(7)]
 
-# Команда /start
-@dp.message(Command("start"))
-async def send_welcome(message: types.Message):
-    await message.answer("Привет! Я бот для бронирования теннисного корта. Используй кнопки ниже для бронирования.", reply_markup=main_menu())
+# Получение клавиатуры для выбора даты
+def get_date_keyboard():
+    keyboard = InlineKeyboardMarkup(row_width=3)
+    dates = get_dates()
+    buttons = [
+        InlineKeyboardButton(date.strftime('%d-%m-%Y'), callback_data=f"date_{date}")
+        for date in dates
+    ]
+    keyboard.add(*buttons)
+    return keyboard
 
-# Главное меню
-def main_menu():
-    builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text="Забронировать", callback_data="book"))
-    builder.add(InlineKeyboardButton(text="Отменить бронь", callback_data="cancel"))
-    builder.adjust(1)
-    return builder.as_markup()
+# Получение клавиатуры для выбора времени
+def get_time_keyboard(date):
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    timeslots = ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"]
+    buttons = [
+        InlineKeyboardButton(slot, callback_data=f"time_{date}_{slot}")
+        for slot in timeslots
+    ]
+    keyboard.add(*buttons)
+    return keyboard
 
-# Календарь для выбора даты
-def generate_calendar(year=None, month=None):
-    now = datetime.now()
-    if year is None:
-        year = now.year
-    if month is None:
-        month = now.month
+# Обработка команды /start
+@dp.message_handler(commands=["start"])
+async def start(message: types.Message):
+    await message.answer("Выберите день для бронирования:", reply_markup=get_date_keyboard())
 
-    builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text=f"{year}-{month:02d}", callback_data="ignore"))
-    builder.add(*[InlineKeyboardButton(text=day, callback_data="ignore") for day in ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]])
-    builder.adjust(7)
+# Обработка выбора даты
+@dp.callback_query_handler(lambda c: c.data.startswith('date_'))
+async def handle_date_selection(callback_query: types.CallbackQuery):
+    selected_date = callback_query.data.split("_")[1]
+    selected_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(
+        callback_query.from_user.id,
+        f"Вы выбрали {selected_date}. Теперь выберите время:",
+        reply_markup=get_time_keyboard(selected_date)
+    )
 
-    month_start = datetime(year=year, month=month, day=1)
-    month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-    start_offset = month_start.weekday()
-    days_in_month = month_end.day
-
-    for day in range(1, days_in_month + 1):
-        date = datetime(year=year, month=month, day=day)
-        if date < now:
-            builder.add(InlineKeyboardButton(text=" ", callback_data="ignore"))
-        else:
-            builder.add(InlineKeyboardButton(text=str(day), callback_data=f"date_{year}-{month:02d}-{day:02d}"))
-
-    builder.add(InlineKeyboardButton(text="Назад", callback_data="back_to_main"))
-    builder.adjust(7)
-    return builder.as_markup()
-
-# Выбор времени
-def generate_time_slots(date):
-    time_slots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]
-    builder = InlineKeyboardBuilder()
-    for time_slot in time_slots:
-        cursor.execute("SELECT * FROM bookings WHERE booking_date = %s AND booking_time = %s", (date, time_slot))
-        if cursor.fetchone():
-            builder.add(InlineKeyboardButton(text=f"❌ {time_slot}", callback_data="ignore"))
-        else:
-            builder.add(InlineKeyboardButton(text=time_slot, callback_data=f"time_{date}_{time_slot}"))
-    builder.add(InlineKeyboardButton(text="Назад", callback_data="back_to_calendar"))
-    builder.adjust(3)
-    return builder.as_markup()
-
-# Обработка callback-запросов
-@dp.callback_query(F.data == "book")
-async def process_book(callback_query: types.CallbackQuery):
-    await callback_query.message.edit_text("Выберите дату:", reply_markup=generate_calendar())
-
-@dp.callback_query(F.data == "cancel")
-async def process_cancel(callback_query: types.CallbackQuery):
-    await callback_query.message.edit_text("Функция отмены бронирования пока не реализована.")
-
-@dp.callback_query(F.data.startswith("date_"))
-async def process_date(callback_query: types.CallbackQuery):
-    date = callback_query.data.split("_")[1]
-    await callback_query.message.edit_text(f"Выберите время для {date}:", reply_markup=generate_time_slots(date))
-
-@dp.callback_query(F.data.startswith("time_"))
-async def process_time(callback_query: types.CallbackQuery):
-    date, time = callback_query.data.split("_")[1], callback_query.data.split("_")[2]
+# Обработка выбора времени
+@dp.callback_query_handler(lambda c: c.data.startswith('time_'))
+async def handle_time_selection(callback_query: types.CallbackQuery):
+    date_str, slot = callback_query.data.split("_")[1], callback_query.data.split("_")[2]
+    selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     user_id = callback_query.from_user.id
-    cursor.execute("INSERT INTO bookings (user_id, booking_date, booking_time) VALUES (%s, %s, %s)", (user_id, date, time))
-    conn.commit()
-    await callback_query.message.edit_text(f"Корт успешно забронирован на {date} в {time}.")
+    user_name = callback_query.from_user.full_name
 
-@dp.callback_query(F.data == "back_to_main")
-async def process_back_to_main(callback_query: types.CallbackQuery):
-    await callback_query.message.edit_text("Главное меню:", reply_markup=main_menu())
+    # Проверка на наличие бронирования
+    conn = await asyncpg.connect(DB_URL)
+    existing_booking = await conn.fetchrow("SELECT * FROM bookings WHERE slot=$1 AND date=$2", slot, selected_date)
 
-@dp.callback_query(F.data == "back_to_calendar")
-async def process_back_to_calendar(callback_query: types.CallbackQuery):
-    await callback_query.message.edit_text("Выберите дату:", reply_markup=generate_calendar())
+    if existing_booking:
+        await bot.answer_callback_query(callback_query.id, text=f"Время {slot} уже занято.")
+        await bot.send_message(callback_query.from_user.id, "Выберите другое время:", reply_markup=get_time_keyboard(selected_date))
+    else:
+        await conn.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES ($1, $2, $3, $4)",
+                           user_id, user_name, slot, selected_date)
+        await bot.answer_callback_query(callback_query.id, text=f"Вы забронировали {slot} на {selected_date}.")
+        await bot.send_message(callback_query.from_user.id, f"Спасибо, вы успешно забронировали {slot} на {selected_date}.", reply_markup=get_date_keyboard())
+    await conn.close()
 
 # Запуск бота
-if __name__ == '__main__':
-    dp.run_polling(bot) callb
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await init_db()
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
