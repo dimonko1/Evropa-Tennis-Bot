@@ -10,7 +10,7 @@ from config import TOKEN, DB_URL
 bot = Bot(token=TOKEN)
 
 # Создание диспетчера
-dp = Dispathcher()
+dp = Dispatcher()
 
 # Подключение к базе PostgreSQL
 async def init_db():
@@ -55,13 +55,25 @@ async def book_time(message: types.Message):
     
     await conn.close()
 
-result = await dp.feed_update(bot=bot, update=incoming_update)
+# Обработка входящих обновлений
+async def handle_updates():
+    from aiogram.utils import get_event_loop, run_polling
+    while True:
+        try:
+            # Получение входящего обновления
+            incoming_update = await bot.get_updates(offset=0, limit=1)
+            if incoming_update:
+                for update in incoming_update:
+                    await dp.feed_update(bot=bot, update=update)
+        except Exception as e:
+            logging.error(f"Ошибка при получении обновлений: {e}")
+        await asyncio.sleep(1)  # ожидание перед повтором получения обновлений
 
 # Запуск бота
 async def main():
     logging.basicConfig(level=logging.INFO)
     await init_db()
-    await dp.start_polling()
+    await handle_updates()  # запускаем обработку обновлений
 
 if __name__ == "__main__":
     asyncio.run(main())
