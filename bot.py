@@ -8,8 +8,6 @@ from config import TOKEN, DB_URL
 
 # Настройки бота
 bot = Bot(token=TOKEN)
-
-# Создание диспетчера
 dp = Dispatcher()
 
 # Подключение к базе PostgreSQL
@@ -30,10 +28,29 @@ timeslots = ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"]
 for slot in timeslots:
     keyboard.add(KeyboardButton(slot))
 
+# Клавиатура для отмены брони
+cancel_button = KeyboardButton("Отменить бронирование")
+cancel_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(cancel_button)
+
 # Команда /start
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     await message.answer("Привет! Выберите время для бронирования:", reply_markup=keyboard)
+
+# Команда для отмены брони
+@dp.message_handler(lambda message: message.text.lower() == "отменить бронирование")
+async def cancel_booking(message: types.Message):
+    user_id = message.from_user.id
+    conn = await asyncpg.connect(DB_URL)
+    booking = await conn.fetchrow("SELECT * FROM bookings WHERE user_id=$1 AND date=$2", user_id, datetime.now().date())
+
+    if booking:
+        await conn.execute("DELETE FROM bookings WHERE user_id=$1 AND date=$2", user_id, datetime.now().date())
+        await message.answer("Ваше бронирование отменено.", reply_markup=keyboard)
+    else:
+        await message.answer("У вас нет активных бронирований для сегодняшнего дня.", reply_markup=keyboard)
+
+    await conn.close()
 
 # Обработка выбора времени
 @dp.message_handler(lambda message: message.text in timeslots)
@@ -55,25 +72,11 @@ async def book_time(message: types.Message):
     
     await conn.close()
 
-# Обработка входящих обновлений
-async def handle_updates():
-    from aiogram.utils import get_event_loop, run_polling
-    while True:
-        try:
-            # Получение входящего обновления
-            incoming_update = await bot.get_updates(offset=0, limit=1)
-            if incoming_update:
-                for update in incoming_update:
-                    await dp.feed_update(bot=bot, update=update)
-        except Exception as e:
-            logging.error(f"Ошибка при получении обновлений: {e}")
-        await asyncio.sleep(1)  # ожидание перед повтором получения обновлений
-
 # Запуск бота
 async def main():
     logging.basicConfig(level=logging.INFO)
     await init_db()
-    await handle_updates()  # запускаем обработку обновлений
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
