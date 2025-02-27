@@ -85,16 +85,16 @@ def generate_time_slots(date):
 async def process_book(callback_query: types.CallbackQuery):
     await callback_query.message.edit_text("Выберите дату:", reply_markup=generate_calendar())
 
-@dp.callback_query(F.data == "cancel"))
+@dp.callback_query(F.data == "cancel")
 async def process_cancel(callback_query: types.CallbackQuery):
     await callback_query.message.edit_text("Функция отмены бронирования пока не реализована.")
 
-@dp.callback_query(F.data.startswith("date_")))
+@dp.callback_query(F.data.startswith("date_"))
 async def process_date(callback_query: types.CallbackQuery):
     date = callback_query.data.split("_")[1]
     await callback_query.message.edit_text(f"Выберите время для {date}:", reply_markup=generate_time_slots(date))
 
-@dp.callback_query(F.data.startswith("time_")))
+@dp.callback_query(F.data.startswith("time_"))
 async def process_time(callback_query: types.CallbackQuery):
     date, time = callback_query.data.split("_")[1], callback_query.data.split("_")[2]
     user_id = callback_query.from_user.id
@@ -102,11 +102,11 @@ async def process_time(callback_query: types.CallbackQuery):
     conn.commit()
     await callback_query.message.edit_text(f"Корт успешно забронирован на {date} в {time}.")
 
-@dp.callback_query(F.data == "back_to_main"))
+@dp.callback_query(F.data == "back_to_main")
 async def process_back_to_main(callback_query: types.CallbackQuery):
     await callback_query.message.edit_text("Главное меню:", reply_markup=main_menu())
 
-@dp.callback_query(F.data == "back_to_calendar"))
+@dp.callback_query(F.data == "back_to_calendar")
 async def process_back_to_calendar(callback_query: types.CallbackQuery):
     await callback_query.message.edit_text("Выберите дату:", reply_markup=generate_calendar())
 
