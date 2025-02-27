@@ -81,7 +81,7 @@ def generate_time_slots(date):
     return builder.as_markup()
 
 # Обработка callback-запросов
-@dp.callback_query(F.data == "book"))
+@dp.callback_query(F.data == "book")
 async def process_book(callback_query: types.CallbackQuery):
     await callback_query.message.edit_text("Выберите дату:", reply_markup=generate_calendar())
 
