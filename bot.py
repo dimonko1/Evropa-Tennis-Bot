@@ -10,7 +10,7 @@ from config import TOKEN, DB_URL
 bot = Bot(token=TOKEN)
 
 # Создание диспетчера
-dp = Dispatcher(bot)
+dp = Dispathcher()
 
 # Подключение к базе PostgreSQL
 async def init_db():
@@ -54,6 +54,8 @@ async def book_time(message: types.Message):
         await message.answer(f"Вы забронировали {slot}. Спасибо!", reply_markup=keyboard)
     
     await conn.close()
+
+result = await dp.feed_update(bot=bot, update=incoming_update)
 
 # Запуск бота
 async def main():
