@@ -4,7 +4,7 @@ import os
 import psycopg2
 from psycopg2.extras import DictCursor
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.executor import start_webhook
 from datetime import datetime, timedelta
 
@@ -39,15 +39,19 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Клавиатура для выбора даты на 30 дней вперёд
+# Клавиатура для выбора даты на 30 дней вперёд с днями недели
 def get_date_keyboard():
     keyboard = InlineKeyboardMarkup(row_width=7)
     today = datetime.now()
     for i in range(30):
         date = today + timedelta(days=i)
         date_str = date.strftime('%Y-%m-%d')
-        button = InlineKeyboardButton(date.strftime('%d-%m'), callback_data=f"select_date_{date_str}")
+        weekday = date.strftime('%a')  # Аббревиатура дня недели (например, "Mon", "Tue", "Wed")
+        
+        # Кнопка с датой и днем недели
+        button = InlineKeyboardButton(f"{weekday} {date.strftime('%d-%m')}", callback_data=f"select_date_{date_str}")
         keyboard.add(button)
+    
     return keyboard
 
 # Клавиатура для выбора времени
@@ -58,31 +62,23 @@ def get_time_keyboard():
         keyboard.add(KeyboardButton(slot))
     return keyboard
 
-# Словарь для хранения данных о бронированиях пользователя
 user_booking_data = {}
 
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
 
-@dp.callback_query_handler(lambda c: c.data.startswith("select_date_"))
+@dp.callback_query_handler(lambda callback_query: callback_query.data.startswith("select_date_"))
 async def choose_date(callback_query: types.CallbackQuery):
-    selected_date = callback_query.data.split("_")[2]
-    user_id = callback_query.from_user.id
-    user_name = callback_query.from_user.full_name
-    user_booking_data[user_id] = {"date": selected_date}
+    date_str = callback_query.data.replace("select_date_", "")
+    user_booking_data[callback_query.from_user.id] = {"date": date_str}
     
-    await bot.answer_callback_query(callback_query.id, text=f"Вы выбрали {selected_date}. Теперь выберите время:")
-    await bot.send_message(callback_query.from_user.id, "Теперь выберите время:", reply_markup=get_time_keyboard())
+    await callback_query.message.answer("Теперь выберите время:", reply_markup=get_time_keyboard())
 
 @dp.message_handler(lambda message: message.text in ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"])
 async def book_time(message: types.Message):
     user_id = message.from_user.id
     user_name = message.from_user.full_name
-    if user_id not in user_booking_data or "date" not in user_booking_data[user_id]:
-        await message.answer("Пожалуйста, выберите сначала дату.")
-        return
-
     date = user_booking_data[user_id]["date"]
     slot = message.text
     
@@ -120,6 +116,24 @@ async def my_bookings(message: types.Message):
         await message.answer("Ваши бронирования:\n" + "\n".join([f"{b[0]} {b[1]}" for b in bookings]))
     else:
         await message.answer("У вас нет активных броней.")
+
+# Функция для проверки, занято ли время
+def check_booking(slot, date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM bookings WHERE slot = %s AND date = %s", (slot, date))
+    booking = cursor.fetchone()
+    conn.close()
+    return booking is not None
+
+# Функция для добавления брони
+def add_booking(user_id, user_name, slot, date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)",
+                   (user_id, user_name, slot, date))
+    conn.commit()
+    conn.close()
 
 async def on_startup(dp):
     logging.basicConfig(level=logging.INFO)
