@@ -1,1 +1,4 @@
-aiogram
+aiogram==2.23.1
+asyncio==3.4.3
+psycopg2-binary==2.9.9
+logging==0.4.9.6
