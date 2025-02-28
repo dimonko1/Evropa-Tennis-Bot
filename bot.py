@@ -6,7 +6,7 @@ from psycopg2.extras import DictCursor
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
-from datetime import datetime
+from datetime import datetime, timedelta
 
 TOKEN = "8092903063:AAEUSIAh3DVRs5-sRwih9rZvSUiXKwKT1fY"
 DATABASE_URL = "postgresql://evropa_tennis_bot_user:diqEKRwZ4LPfWOWvRijYkR7LbCUXS7xN@dpg-cv0b601u0jms73fbpr9g-a/evropa_tennis_bot"
