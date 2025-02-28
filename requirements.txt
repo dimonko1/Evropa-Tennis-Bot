@@ -1,4 +1,1 @@
-telebot
-flask
-pytz
-PIL
+aiogram
