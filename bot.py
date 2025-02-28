@@ -8,7 +8,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 from datetime import datetime, timedelta
 
-TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA
+TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA"
 DATABASE_URL = "postgresql://evropa_tennis_bot_user:diqEKRwZ4LPfWOWvRijYkR7LbCUXS7xN@dpg-cv0b601u0jms73fbpr9g-a/evropa_tennis_bot"
 WEBHOOK_HOST = "https://evropa-tennis-bot.onrender.com"
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
