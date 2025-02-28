@@ -1,5 +1,4 @@
 import logging
-import asyncio
 import os
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -78,6 +77,12 @@ async def choose_date(callback_query: types.CallbackQuery):
 @dp.message_handler(lambda message: message.text in ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"])
 async def book_time(message: types.Message):
     user_id = message.from_user.id
+
+    # Проверяем, есть ли дата в данных пользователя
+    if user_id not in user_booking_data or "date" not in user_booking_data[user_id]:
+        await message.answer("Сначала выберите дату для бронирования.", reply_markup=get_date_keyboard())
+        return
+    
     user_name = message.from_user.full_name
     date = user_booking_data[user_id]["date"]
     slot = message.text
@@ -138,7 +143,6 @@ def add_booking(user_id, user_name, slot, date):
 async def on_startup(dp):
     logging.basicConfig(level=logging.INFO)
     init_db()
-    await bot.set_webhook(WEBHOOK_URL)
 
 async def on_shutdown(dp):
     await bot.delete_webhook()
