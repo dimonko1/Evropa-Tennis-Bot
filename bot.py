@@ -135,12 +135,21 @@ async def show_bookings_for_date(message: types.Message):
         text = f"На {date} нет бронирований."
     await message.answer(text, reply_markup=main_menu())
 
+async def on_startup(dp):
+    logging.basicConfig(level=logging.INFO)
+    init_db()
+    await bot.set_webhook(WEBHOOK_URL)
+
+async def on_shutdown(dp):
+    await bot.delete_webhook()
+
 if __name__ == "__main__":
     from aiogram import executor
     executor.start_webhook(
         dispatcher=dp,
         webhook_path=WEBHOOK_PATH,
-        on_startup=init_db,
+        on_startup=on_startup,
+        on_shutdown=on_shutdown,
         host=WEBAPP_HOST,
         port=WEBAPP_PORT
     )
