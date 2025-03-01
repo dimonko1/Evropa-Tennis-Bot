@@ -71,6 +71,9 @@ async def start(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "📅 Новая бронь")
 async def new_booking(message: types.Message):
+    if message.text == "🔙 Назад":
+        await message.answer("Главное меню:", reply_markup=main_menu())
+        return
     await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
 
 @dp.message_handler(lambda message: message.text.startswith("2025"))
@@ -83,6 +86,9 @@ async def choose_date(message: types.Message):
 
 @dp.message_handler(lambda message: message.text in [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)])
 async def book_time(message: types.Message):
+    if message.text == "🔙 Назад":
+        await message.answer("Главное меню:", reply_markup=main_menu())
+        return
     user_id = message.from_user.id
     user_name = message.from_user.full_name
     date = user_booking_data.get(user_id, {}).get("date")
@@ -104,10 +110,16 @@ async def book_time(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "🔍 Посмотреть все бронирования")
 async def view_all_bookings(message: types.Message):
+    if message.text == "🔙 Назад":
+        await message.answer("Главное меню:", reply_markup=main_menu())
+        return
     await message.answer("Выберите дату:", reply_markup=get_date_keyboard())
 
 @dp.message_handler(lambda message: message.text.startswith("2025"))
 async def show_bookings_for_date(message: types.Message):
+    if message.text == "🔙 Назад":
+        await message.answer("Главное меню:", reply_markup=main_menu())
+        return
     date = message.text.split(",")[0]
     conn = get_db_connection()
     cursor = conn.cursor()
