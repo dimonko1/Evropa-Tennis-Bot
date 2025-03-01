@@ -19,6 +19,7 @@ WEBAPP_PORT = int(os.getenv("PORT", 8080))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
+locale.setlocale(locale.LC_ALL, '')
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=DictCursor)
@@ -49,9 +50,8 @@ def main_menu():
     return keyboard
 
 def get_date_keyboard():
-    locale.setlocale(locale.LC_ALL, '')
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=7)
-    days = [datetime.now() + timedelta(days=i) for i in range(31)]
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+    days = [datetime.now() + timedelta(days=i) for i in range(7)]
     buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
     keyboard.add(*buttons, KeyboardButton("🔙 Назад"))
     return keyboard
@@ -61,6 +61,18 @@ def get_time_keyboard():
     timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
     keyboard.add(*[KeyboardButton(slot) for slot in timeslots], KeyboardButton("🔙 Назад"))
     return keyboard
+
+def get_user_bookings_keyboard(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, date, slot FROM bookings WHERE user_id = %s ORDER BY date, slot", (user_id,))
+    bookings = cursor.fetchall()
+    conn.close()
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    for booking in bookings:
+        keyboard.add(KeyboardButton(f"{booking[0]}: {booking[1]}, {booking[2]}"))
+    keyboard.add(KeyboardButton("🔙 Назад"))
+    return keyboard if bookings else None
 
 user_booking_data = {}
 
@@ -72,49 +84,35 @@ async def start(message: types.Message):
 async def new_booking(message: types.Message):
     await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
 
+@dp.message_handler(lambda message: message.text == "❌ Отменить бронь")
+async def cancel_booking(message: types.Message):
+    keyboard = get_user_bookings_keyboard(message.from_user.id)
+    if keyboard:
+        await message.answer("Выберите бронь для отмены:", reply_markup=keyboard)
+    else:
+        await message.answer("У вас нет активных бронирований.", reply_markup=main_menu())
+
+@dp.message_handler(lambda message: message.text.startswith("❌"))
+async def confirm_cancel_booking(message: types.Message):
+    booking_id = message.text.split(":")[0]
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bookings WHERE id = %s", (booking_id,))
+    conn.commit()
+    conn.close()
+    await message.answer("Бронирование отменено.", reply_markup=main_menu())
+
 @dp.message_handler(lambda message: message.text == "🔙 Назад")
 async def go_back(message: types.Message):
     await message.answer("Главное меню:", reply_markup=main_menu())
 
-@dp.message_handler(lambda message: message.text.startswith("2025"))
-async def choose_date(message: types.Message):
-    user_booking_data[message.from_user.id] = {"date": message.text.split(",")[0]}
-    await message.answer("Теперь выберите время:", reply_markup=get_time_keyboard())
-
-@dp.message_handler(lambda message: message.text in [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)])
-async def book_time(message: types.Message):
-    user_id = message.from_user.id
-    user_name = message.from_user.full_name
-    date = user_booking_data.get(user_id, {}).get("date")
-    slot = message.text
-    if date is None:
-        await message.answer("Сначала выберите дату!", reply_markup=get_date_keyboard())
-        return
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM bookings WHERE slot = %s AND date = %s", (slot, date))
-    if cursor.fetchone()[0] > 0:
-        await message.answer(f"Время {slot} на {date} уже занято. Выберите другое.", reply_markup=get_time_keyboard())
-    else:
-        cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)", (user_id, user_name, slot, date))
-        conn.commit()
-        await message.answer(f"Вы забронировали {slot} на {date}.", reply_markup=main_menu())
-    conn.close()
-    user_booking_data.pop(user_id, None)
-
 @dp.message_handler(lambda message: message.text == "📋 Мои бронирования")
 async def my_bookings(message: types.Message):
-    user_id = message.from_user.id
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT date, slot FROM bookings WHERE user_id = %s ORDER BY date, slot", (user_id,))
-    bookings = cursor.fetchall()
-    conn.close()
-    if bookings:
-        text = "Ваши бронирования:\n" + "\n".join([f"{b[0]}, {b[1]}" for b in bookings])
+    keyboard = get_user_bookings_keyboard(message.from_user.id)
+    if keyboard:
+        await message.answer("Ваши бронирования:", reply_markup=keyboard)
     else:
-        text = "У вас нет активных бронирований."
-    await message.answer(text, reply_markup=main_menu())
+        await message.answer("У вас нет активных бронирований.", reply_markup=main_menu())
 
 @dp.message_handler(lambda message: message.text == "🔍 Посмотреть все бронирования")
 async def view_all_bookings(message: types.Message):
