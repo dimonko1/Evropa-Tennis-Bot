@@ -14,7 +14,7 @@ WEBHOOK_HOST = "https://evropa-tennis-bot.onrender.com"
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(os.getenv("PORT", 8080))
+WEBAPP_PORT = int(os.getenv("PORT", 5000))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
@@ -49,7 +49,8 @@ def main_menu():
 
 def get_date_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')) for i in range(7)]
+    days = [datetime.now() + timedelta(days=i) for i in range(7)]
+    buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
     buttons.append(KeyboardButton("🔙 Назад"))
     keyboard.add(*buttons)
     return keyboard
@@ -72,12 +73,12 @@ async def start(message: types.Message):
 async def new_booking(message: types.Message):
     await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
 
-@dp.message_handler(lambda message: message.text.count("-") == 2)
+@dp.message_handler(lambda message: message.text.startswith("2025"))
 async def choose_date(message: types.Message):
     if message.text == "🔙 Назад":
         await message.answer("Главное меню:", reply_markup=main_menu())
         return
-    user_booking_data[message.from_user.id] = {"date": message.text}
+    user_booking_data[message.from_user.id] = {"date": message.text.split(",")[0]}
     await message.answer("Теперь выберите время:", reply_markup=get_time_keyboard())
 
 @dp.message_handler(lambda message: message.text in [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)])
@@ -101,30 +102,13 @@ async def book_time(message: types.Message):
     conn.close()
     user_booking_data.pop(user_id, None)
 
-@dp.message_handler(lambda message: message.text == "❌ Отменить бронь")
-async def cancel_booking(message: types.Message):
-    user_id = message.from_user.id
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, slot, date FROM bookings WHERE user_id = %s", (user_id,))
-    bookings = cursor.fetchall()
-    if bookings:
-        keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
-        buttons = [KeyboardButton(f"{b[2]} {b[1]}") for b in bookings]
-        buttons.append(KeyboardButton("🔙 Назад"))
-        keyboard.add(*buttons)
-        await message.answer("Выберите бронь для отмены:", reply_markup=keyboard)
-    else:
-        await message.answer("У вас нет активных броней.", reply_markup=main_menu())
-    conn.close()
-
 @dp.message_handler(lambda message: message.text == "🔍 Посмотреть все бронирования")
 async def view_all_bookings(message: types.Message):
     await message.answer("Выберите дату:", reply_markup=get_date_keyboard())
 
-@dp.message_handler(lambda message: message.text in [b.text for b in get_date_keyboard().keyboard[0]])
+@dp.message_handler(lambda message: message.text.startswith("2025"))
 async def show_bookings_for_date(message: types.Message):
-    date = message.text
+    date = message.text.split(",")[0]
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_name FROM bookings WHERE date = %s", (date,))
