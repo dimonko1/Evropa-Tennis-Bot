@@ -19,7 +19,6 @@ WEBAPP_PORT = int(os.getenv("PORT", 8080))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
-locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=DictCursor)
