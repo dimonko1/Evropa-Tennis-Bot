@@ -39,6 +39,25 @@ def init_db():
     conn.commit()
     conn.close()
 
+def check_booking(slot, date):
+    """Проверяет, занято ли время на определенную дату."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM bookings WHERE slot = %s AND date = %s", (slot, date))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0  # True, если уже забронировано
+
+
+def add_booking(user_id, user_name, slot, date):
+    """Добавляет бронирование в базу данных."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)",
+                   (user_id, user_name, slot, date))
+    conn.commit()
+    conn.close()
+
 # Клавиатуры с датами и временем
 def get_date_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
