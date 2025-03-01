@@ -48,8 +48,8 @@ def main_menu():
     return keyboard
 
 def get_date_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    days = [datetime.now() + timedelta(days=i) for i in range(7)]
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=5)
+    days = [datetime.now() + timedelta(days=i) for i in range(31)]
     buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
     buttons.append(KeyboardButton("🔙 Назад"))
     keyboard.add(*buttons)
