@@ -68,14 +68,24 @@ async def choose_date(message: types.Message):
 async def book_time(message: types.Message):
     user_id = message.from_user.id
     user_name = message.from_user.full_name
+    
+    # Проверяем, выбрал ли пользователь дату
+    if user_id not in user_booking_data:
+        await message.answer("Сначала выберите дату!", reply_markup=get_date_keyboard())
+        return
+
     date = user_booking_data[user_id]["date"]
     slot = message.text
-    
+
     if check_booking(slot, date):
         await message.answer(f"Время {slot} на {date} уже занято. Выберите другое.", reply_markup=get_time_keyboard())
     else:
         add_booking(user_id, user_name, slot, date)
         await message.answer(f"Вы забронировали {slot} на {date}. Спасибо!")
+
+        # Очищаем данные после бронирования
+        del user_booking_data[user_id]
+
 
 @dp.message_handler(commands=["cancel"])
 async def cancel_booking(message: types.Message):
