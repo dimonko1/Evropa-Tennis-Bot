@@ -8,7 +8,6 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 from datetime import datetime, timedelta
 import locale
-locale.setlocale(locale.LC_TIME, "ru_RU")
 
 TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA"
 DATABASE_URL = "postgresql://evropa_tennis_bot_user:diqEKRwZ4LPfWOWvRijYkR7LbCUXS7xN@dpg-cv0b601u0jms73fbpr9g-a/evropa_tennis_bot"
@@ -50,6 +49,7 @@ def main_menu():
     return keyboard
 
 def get_date_keyboard():
+    locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=7)
     days = [datetime.now() + timedelta(days=i) for i in range(31)]
     buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
