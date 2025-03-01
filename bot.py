@@ -14,7 +14,7 @@ WEBHOOK_HOST = "https://evropa-tennis-bot.onrender.com"
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(os.getenv("PORT", 10000))
+WEBAPP_PORT = int(os.getenv("PORT", 8080))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
@@ -37,31 +37,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-def main_menu():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    keyboard.add(
-        KeyboardButton("📅 Новая бронь"),
-        KeyboardButton("❌ Отменить бронь"),
-        KeyboardButton("📋 Мои бронирования"),
-        KeyboardButton("🔍 Посмотреть все бронирования")
-    )
-    return keyboard
-
-def get_date_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')) for i in range(31)]
-    keyboard.add(*buttons)
-    return keyboard
-
-def get_time_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
-    timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
-    buttons = [KeyboardButton(slot) for slot in timeslots]
-    keyboard.add(*buttons)
-    return keyboard
-
-user_booking_data = {}
-
 def check_booking(slot, date):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -78,6 +53,31 @@ def add_booking(user_id, user_name, slot, date):
     conn.commit()
     conn.close()
     
+def main_menu():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    keyboard.add(
+        KeyboardButton("📅 Новая бронь"),
+        KeyboardButton("❌ Отменить бронь"),
+        KeyboardButton("📋 Мои бронирования"),
+        KeyboardButton("🔍 Посмотреть все бронирования")
+    )
+    return keyboard
+
+def get_date_keyboard():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+    buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')) for i in range(7)]
+    keyboard.add(*buttons)
+    return keyboard
+
+def get_time_keyboard():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
+    timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
+    buttons = [KeyboardButton(slot) for slot in timeslots]
+    keyboard.add(*buttons)
+    return keyboard
+
+user_booking_data = {}
+
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
     await message.answer("Выберите действие:", reply_markup=main_menu())
@@ -143,7 +143,7 @@ async def show_bookings_for_date(message: types.Message):
     if bookings:
         text = f"Бронирования на {date}:\n" + "\n".join([f"{b[0]} - {b[1]}" for b in bookings])
     else:
-        text = "На эту дату нет бронирований."
+        text = f"На {date} нет бронирований."
     
     await message.answer(text, reply_markup=main_menu())
 
