@@ -17,6 +17,8 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 10000))
 
+locale.setlocale(locale.LC_ALL, 'ru_RU')
+
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
@@ -50,14 +52,14 @@ def main_menu():
 
 def get_date_keyboard(action):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
-    days = [datetime.now() + timedelta(days=i) for i in range(7)]
-    buttons = [KeyboardButton(f"{day.strftime('%Y-%m-%d, %a')}|{action}") for day in days]
+    days = [datetime.now() + timedelta(days=i) for i in range(31)]
+    buttons = [KeyboardButton(f"{day.strftime('%Y-%m-%d, %a')}") for day in days]
     keyboard.add(*buttons, KeyboardButton("🏠 Меню"))
     return keyboard
 
 def get_time_keyboard(date):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
-    timeslots = [f"{hour}:00–{hour+1}:00|{date}" for hour in range(7, 21)]
+    timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
     keyboard.add(*[KeyboardButton(slot) for slot in timeslots], KeyboardButton("🏠 Меню"))
     return keyboard
 
