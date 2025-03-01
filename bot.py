@@ -48,13 +48,13 @@ def main_menu():
     return keyboard
 
 def get_date_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=7)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d, %a')) for i in range(31)]
     keyboard.add(*buttons)
     return keyboard
 
 def get_time_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=5)
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
     timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
     buttons = [KeyboardButton(slot) for slot in timeslots]
     keyboard.add(*buttons)
@@ -106,7 +106,7 @@ async def cancel_booking(message: types.Message):
     conn.close()
     
     if deleted:
-        await message.answer(f"Вы отменили бронь на: {', '.join([f'{d[1]} {d[0]}' for d in deleted])}", reply_markup=main_menu())
+        await message.answer(f"Вы отменили бронь на: {', '.join([f'{d[1]} {d[0][:-9]}\n' for d in deleted])}", reply_markup=main_menu())
     else:
         await message.answer("У вас нет активных броней.", reply_markup=main_menu())
 
