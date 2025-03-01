@@ -17,7 +17,7 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 10000))
 
-locale.setlocale(locale.LC_ALL, 'ru_RU')
+#locale.setlocale(locale.LC_ALL, 'ru_RU')
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
