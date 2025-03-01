@@ -8,7 +8,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 from datetime import datetime, timedelta
 
-TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA"
+TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA
 DATABASE_URL = "postgresql://evropa_tennis_bot_user:diqEKRwZ4LPfWOWvRijYkR7LbCUXS7xN@dpg-cv0b601u0jms73fbpr9g-a/evropa_tennis_bot"
 WEBHOOK_HOST = "https://evropa-tennis-bot.onrender.com"
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
@@ -39,28 +39,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-def check_booking(slot, date):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT 1 FROM bookings WHERE slot = %s AND date = %s LIMIT 1", (slot, date))
-    exists = cursor.fetchone()
-    conn.close()
-    return exists is not None
-
-
 # Клавиатуры с датами и временем
 def get_date_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    for i in range(30):
-        date = (datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')
-        keyboard.add(KeyboardButton(date))
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
+    buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')) for i in range(7)]
+    keyboard.add(*buttons)
     return keyboard
 
 def get_time_keyboard():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    timeslots = ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"]
-    for slot in timeslots:
-        keyboard.add(KeyboardButton(slot))
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
+    timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
+    buttons = [KeyboardButton(slot) for slot in timeslots]
+    keyboard.add(*buttons)
     return keyboard
 
 user_booking_data = {}
@@ -74,7 +64,7 @@ async def choose_date(message: types.Message):
     user_booking_data[message.from_user.id] = {"date": message.text}
     await message.answer("Теперь выберите время:", reply_markup=get_time_keyboard())
 
-@dp.message_handler(lambda message: message.text in ["08:00–09:00", "09:00–10:00", "10:00–11:00", "11:00–12:00"])
+@dp.message_handler(lambda message: message.text.endswith(":00–") or message.text.endswith(":00"))
 async def book_time(message: types.Message):
     user_id = message.from_user.id
     user_name = message.from_user.full_name
