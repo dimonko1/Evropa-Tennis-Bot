@@ -19,11 +19,9 @@ WEBAPP_PORT = int(os.getenv("PORT", 10000))
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-# Подключение к PostgreSQL
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=DictCursor)
 
-# Создание таблицы, если её нет
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -39,26 +37,15 @@ def init_db():
     conn.commit()
     conn.close()
 
-def check_booking(slot, date):
-    """Проверяет, занято ли время на определенную дату."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM bookings WHERE slot = %s AND date = %s", (slot, date))
-    count = cursor.fetchone()[0]
-    conn.close()
-    return count > 0  # True, если уже забронировано
+def main_menu():
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    keyboard.add(
+        KeyboardButton("📅 Новая бронь"),
+        KeyboardButton("❌ Отменить бронь"),
+        KeyboardButton("📋 Мои бронирования")
+    )
+    return keyboard
 
-
-def add_booking(user_id, user_name, slot, date):
-    """Добавляет бронирование в базу данных."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)",
-                   (user_id, user_name, slot, date))
-    conn.commit()
-    conn.close()
-
-# Клавиатуры с датами и временем
 def get_date_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     buttons = [KeyboardButton((datetime.now() + timedelta(days=i)).strftime('%Y-%m-%d')) for i in range(7)]
@@ -76,6 +63,10 @@ user_booking_data = {}
 
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
+    await message.answer("Выберите действие:", reply_markup=main_menu())
+
+@dp.message_handler(lambda message: message.text == "📅 Новая бронь")
+async def new_booking(message: types.Message):
     await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
 
 @dp.message_handler(lambda message: message.text.count("-") == 2)
@@ -83,30 +74,27 @@ async def choose_date(message: types.Message):
     user_booking_data[message.from_user.id] = {"date": message.text}
     await message.answer("Теперь выберите время:", reply_markup=get_time_keyboard())
 
-@dp.message_handler(lambda message: message.text.endswith(":00–") or message.text.endswith(":00"))
+@dp.message_handler(lambda message: 
+    any(message.text.startswith(f"{hour}:00") for hour in range(7, 21)))
 async def book_time(message: types.Message):
     user_id = message.from_user.id
     user_name = message.from_user.full_name
     
-    # Проверяем, выбрал ли пользователь дату
     if user_id not in user_booking_data:
         await message.answer("Сначала выберите дату!", reply_markup=get_date_keyboard())
         return
-
+    
     date = user_booking_data[user_id]["date"]
     slot = message.text
-
+    
     if check_booking(slot, date):
         await message.answer(f"Время {slot} на {date} уже занято. Выберите другое.", reply_markup=get_time_keyboard())
     else:
         add_booking(user_id, user_name, slot, date)
-        await message.answer(f"Вы забронировали {slot} на {date}. Спасибо!")
-
-        # Очищаем данные после бронирования
+        await message.answer(f"Вы забронировали {slot} на {date}. Спасибо!", reply_markup=main_menu())
         del user_booking_data[user_id]
 
-
-@dp.message_handler(commands=["cancel"])
+@dp.message_handler(lambda message: message.text == "❌ Отменить бронь")
 async def cancel_booking(message: types.Message):
     user_id = message.from_user.id
     conn = get_db_connection()
@@ -117,11 +105,11 @@ async def cancel_booking(message: types.Message):
     conn.close()
     
     if deleted:
-        await message.answer(f"Вы отменили бронь на: {', '.join([f'{d[1]} {d[0]}' for d in deleted])}")
+        await message.answer(f"Вы отменили бронь на: {', '.join([f'{d[1]} {d[0]}' for d in deleted])}", reply_markup=main_menu())
     else:
-        await message.answer("У вас нет активных броней.")
+        await message.answer("У вас нет активных броней.", reply_markup=main_menu())
 
-@dp.message_handler(commands=["mybookings"])
+@dp.message_handler(lambda message: message.text == "📋 Мои бронирования")
 async def my_bookings(message: types.Message):
     user_id = message.from_user.id
     conn = get_db_connection()
@@ -131,9 +119,25 @@ async def my_bookings(message: types.Message):
     conn.close()
     
     if bookings:
-        await message.answer("Ваши бронирования:\n" + "\n".join([f"{b[0]} {b[1]}" for b in bookings]))
+        await message.answer("Ваши бронирования:\n" + "\n".join([f"{b[0]} {b[1]}" for b in bookings]), reply_markup=main_menu())
     else:
-        await message.answer("У вас нет активных броней.")
+        await message.answer("У вас нет активных броней.", reply_markup=main_menu())
+
+def check_booking(slot, date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM bookings WHERE slot = %s AND date = %s", (slot, date))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count > 0
+
+def add_booking(user_id, user_name, slot, date):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)",
+                   (user_id, user_name, slot, date))
+    conn.commit()
+    conn.close()
 
 async def on_startup(dp):
     logging.basicConfig(level=logging.INFO)
