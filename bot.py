@@ -7,6 +7,8 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 from datetime import datetime, timedelta
+import locale
+locale.setlocale(locale.LC_TIME, "ru_RU")
 
 TOKEN = "8092903063:AAHGdwmtY_4EYG797u5DlLrecFEE2_QabeA"
 DATABASE_URL = "postgresql://evropa_tennis_bot_user:diqEKRwZ4LPfWOWvRijYkR7LbCUXS7xN@dpg-cv0b601u0jms73fbpr9g-a/evropa_tennis_bot"
@@ -108,7 +110,10 @@ async def my_bookings(message: types.Message):
     cursor.execute("SELECT date, slot FROM bookings WHERE user_id = %s ORDER BY date, slot", (user_id,))
     bookings = cursor.fetchall()
     conn.close()
-    text = "Ваши бронирования:\n" + "\n".join([f"{b[0]}, {b[1]}" for b in bookings]) if bookings else "У вас нет активных бронирований."
+    if bookings:
+        text = "Ваши бронирования:\n" + "\n".join([f"{b[0]}, {b[1]}" for b in bookings])
+    else:
+        text = "У вас нет активных бронирований."
     await message.answer(text, reply_markup=main_menu())
 
 @dp.message_handler(lambda message: message.text == "🔍 Посмотреть все бронирования")
@@ -120,10 +125,13 @@ async def show_bookings_for_date(message: types.Message):
     date = message.text.split(",")[0]
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_name FROM bookings WHERE date = %s", (date,))
+    cursor.execute("SELECT user_name, slot FROM bookings WHERE date = %s", (date,))
     bookings = cursor.fetchall()
     conn.close()
-    text = f"Бронирования на {date}:\n" + "\n".join([b[0] for b in bookings]) if bookings else f"На {date} нет бронирований."
+    if bookings:
+        text = f"Бронирования на {date}:\n" + "\n".join([f"{b[0]} - {b[1]}" for b in bookings])
+    else:
+        text = f"На {date} нет бронирований."
     await message.answer(text, reply_markup=main_menu())
 
 async def on_startup(dp):
