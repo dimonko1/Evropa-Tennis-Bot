@@ -15,11 +15,11 @@ WEBHOOK_HOST = "https://evropa-tennis-bot.onrender.com"
 WEBHOOK_PATH = f"/webhook/{TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
-WEBAPP_PORT = int(os.getenv("PORT", 0000))
+WEBAPP_PORT = int(os.getenv("PORT", 8080))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
-locale.setlocale(locale.LC_ALL, '')
+locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, sslmode='require', cursor_factory=DictCursor)
@@ -49,17 +49,17 @@ def main_menu():
     )
     return keyboard
 
-def get_date_keyboard():
+def get_date_keyboard(action):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     days = [datetime.now() + timedelta(days=i) for i in range(7)]
-    buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
-    keyboard.add(*buttons, KeyboardButton("🔙 Назад"))
+    buttons = [KeyboardButton(f"{day.strftime('%Y-%m-%d, %a')}|{action}") for day in days]
+    keyboard.add(*buttons, KeyboardButton("🏠 Меню"))
     return keyboard
 
-def get_time_keyboard():
+def get_time_keyboard(date):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=4)
-    timeslots = [f"{hour}:00–{hour+1}:00" for hour in range(7, 21)]
-    keyboard.add(*[KeyboardButton(slot) for slot in timeslots], KeyboardButton("🔙 Назад"))
+    timeslots = [f"{hour}:00–{hour+1}:00|{date}" for hour in range(7, 21)]
+    keyboard.add(*[KeyboardButton(slot) for slot in timeslots], KeyboardButton("🏠 Меню"))
     return keyboard
 
 def get_user_bookings_keyboard(user_id):
@@ -71,10 +71,8 @@ def get_user_bookings_keyboard(user_id):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
     for booking in bookings:
         keyboard.add(KeyboardButton(f"{booking[0]}: {booking[1]}, {booking[2]}"))
-    keyboard.add(KeyboardButton("🔙 Назад"))
+    keyboard.add(KeyboardButton("🏠 Меню"))
     return keyboard if bookings else None
-
-user_booking_data = {}
 
 @dp.message_handler(commands=["start"])
 async def start(message: types.Message):
@@ -82,7 +80,23 @@ async def start(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "📅 Новая бронь")
 async def new_booking(message: types.Message):
-    await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard())
+    await message.answer("Выберите дату для бронирования:", reply_markup=get_date_keyboard("book"))
+
+@dp.message_handler(lambda message: "|book" in message.text)
+async def select_time(message: types.Message):
+    date = message.text.split("|")[0]
+    await message.answer("Выберите время:", reply_markup=get_time_keyboard(date))
+
+@dp.message_handler(lambda message: "–" in message.text and "|" in message.text)
+async def confirm_booking(message: types.Message):
+    slot, date = message.text.split("|")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO bookings (user_id, user_name, slot, date) VALUES (%s, %s, %s, %s)",
+                   (message.from_user.id, message.from_user.full_name, slot, date))
+    conn.commit()
+    conn.close()
+    await message.answer("Бронь подтверждена!", reply_markup=main_menu())
 
 @dp.message_handler(lambda message: message.text == "❌ Отменить бронь")
 async def cancel_booking(message: types.Message):
@@ -92,18 +106,8 @@ async def cancel_booking(message: types.Message):
     else:
         await message.answer("У вас нет активных бронирований.", reply_markup=main_menu())
 
-@dp.message_handler(lambda message: message.text.startswith("❌"))
-async def confirm_cancel_booking(message: types.Message):
-    booking_id = message.text.split(":")[0]
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM bookings WHERE id = %s", (booking_id,))
-    conn.commit()
-    conn.close()
-    await message.answer("Бронирование отменено.", reply_markup=main_menu())
-
-@dp.message_handler(lambda message: message.text == "🔙 Назад")
-async def go_back(message: types.Message):
+@dp.message_handler(lambda message: message.text.startswith("🏠"))
+async def go_to_menu(message: types.Message):
     await message.answer("Главное меню:", reply_markup=main_menu())
 
 @dp.message_handler(lambda message: message.text == "📋 Мои бронирования")
@@ -116,11 +120,11 @@ async def my_bookings(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "🔍 Посмотреть все бронирования")
 async def view_all_bookings(message: types.Message):
-    await message.answer("Выберите дату:", reply_markup=get_date_keyboard())
+    await message.answer("Выберите дату:", reply_markup=get_date_keyboard("view"))
 
-@dp.message_handler(lambda message: message.text.startswith("2025"))
+@dp.message_handler(lambda message: "|view" in message.text)
 async def show_bookings_for_date(message: types.Message):
-    date = message.text.split(",")[0]
+    date = message.text.split("|")[0]
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_name, slot FROM bookings WHERE date = %s", (date,))
@@ -132,21 +136,12 @@ async def show_bookings_for_date(message: types.Message):
         text = f"На {date} нет бронирований."
     await message.answer(text, reply_markup=main_menu())
 
-async def on_startup(dp):
-    logging.basicConfig(level=logging.INFO)
-    init_db()
-    await bot.set_webhook(WEBHOOK_URL)
-
-async def on_shutdown(dp):
-    await bot.delete_webhook()
-
 if __name__ == "__main__":
     from aiogram import executor
     executor.start_webhook(
         dispatcher=dp,
         webhook_path=WEBHOOK_PATH,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
+        on_startup=init_db,
         host=WEBAPP_HOST,
         port=WEBAPP_PORT
     )
