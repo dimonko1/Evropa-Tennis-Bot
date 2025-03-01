@@ -49,7 +49,7 @@ def main_menu():
     return keyboard
 
 def get_date_keyboard():
-    locale.setlocale(locale.LC_TIME, "ru_RU.UTF-8")
+    locale.setlocale(locale.LC_ALL, '')
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, row_width=7)
     days = [datetime.now() + timedelta(days=i) for i in range(31)]
     buttons = [KeyboardButton(day.strftime('%Y-%m-%d, %a')) for day in days]
