@@ -140,7 +140,7 @@ if __name__ == "__main__":
     executor.start_webhook(
         dispatcher=dp,
         webhook_path=WEBHOOK_PATH,
-        on_startup=init_db,
+        on_startup=lambda _: init_db(),
         host=WEBAPP_HOST,
         port=WEBAPP_PORT
     )
